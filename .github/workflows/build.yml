@@ -118,7 +118,6 @@ jobs:
           Tipog15uYllqnjNQUVFiDogPSTABYBNAswqJOdATiuD30YCOcgFt04bvvSXNCrBhoIAPKMoHdY7B
           BwqB9qBAmr1c0D06GkpWwMYBsI8/0IE5CkbBKBgFQwgAACUoW6UAeAAA
           B64
-          ls -R app | head -30
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '17' }
       - uses: actions/setup-go@v5
@@ -137,6 +136,18 @@ jobs:
           go run ./cmd/internal/build_libbox -target android
           mkdir -p $GITHUB_WORKSPACE/app/libs
           cp libbox.aar $GITHUB_WORKSPACE/app/libs/
+      - name: Detect libbox package and dump API
+        run: |
+          mkdir -p /tmp/aar && cd /tmp/aar && unzip -o -q $GITHUB_WORKSPACE/app/libs/libbox.aar classes.jar
+          PKGPATH=$(unzip -Z1 classes.jar | grep '/Libbox.class$' | sed 's|/Libbox.class||' | head -1)
+          PKG=$(echo "$PKGPATH" | tr / .)
+          echo "PKG=$PKG"
+          sed -i "s/io\.nekohq\.libbox/$PKG/g" $GITHUB_WORKSPACE/app/src/main/java/com/my/vpn/VpnSvc.kt
+          { echo "PACKAGE: $PKG"; for c in $(unzip -Z1 classes.jar | grep "^$PKGPATH/[A-Za-z]*\.class$" | sed 's|/|.|g; s|\.class$||'); do javap -public -cp classes.jar $c; done; } > $GITHUB_WORKSPACE/libbox-api.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libbox-api
+          path: libbox-api.txt
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: '8.7' }
       - name: Build APK
